@@ -1,137 +1,129 @@
-// import { NewMessage } from '#cds-models/ChatService';
-// import {
-//   AzureOpenAiChatClient,
-//   AzureOpenAiChatCompletionToolType
-// } from '@sap-ai-sdk/foundation-models';
-// import { ApplicationService } from '@sap/cds';
-// import { Sender } from './entities.js';
+import {
+    AzureOpenAiChatClient,
+    AzureOpenAiChatCompletionToolType
+} from '@sap-ai-sdk/foundation-models';
+import { ApplicationService } from '@sap/cds';
+import { Sender } from './entities.js';
+export default class ChatService extends ApplicationService {
+  init() {
+    const { Chat } = require('#cds-models/ChatService');
 
-// export default class ChatService extends ApplicationService {
-//   init() {
-//     // const Chat = require('#cds-models/ChatService')
+    const { newRecord } = Chat.actions;
 
-//     this.on(NewMessage, async req => {
-//       const chatId:any = req.data.chatid;
+    this.on(newRecord, async req => {
+      //   const chatId:any = req.data.chatid
+      const { Records } = this.entities;
 
-//       const { Chat, Message } = this.entities;
+      const Chat = await SELECT.one.from(req.subject);
+      const [ Chats ] = req.params;
 
-//       const chat = await SELECT.one.from(Chat).where({
-//         ID: chatId
-//       });
+      //   if (!Chat) throw req.reject(404, 'chat "${chatId}" does not exist;');
+      const records = await SELECT.from(Records)
+        .where({
+          chat_ID: Chats
+        })
+        .orderBy('createdAt');
 
-//       if (!chat) throw req.reject(404, 'chat "${chatId}" does not exist;');
+      let messages: any = [
+        {
+          role: Sender.User,
+          content: req.data.content?.trim().replace(/\n/g, ' ')
+        }
+      ];
 
-//       const messageList = await SELECT.from(Message)
-//         .where({
-//           UUIDChat: chatId
-//         })
-//         .orderBy('createdAt');
+      if (records) {
+        let messages = records.map(
+          (record: { role: string; content: string }) => ({
+            role:
+              record.role === Sender.Assistant ? Sender.Assistant : Sender.User,
+            content: record.content.trim().replace(/\n/g, ' ')
+          })
+        );
+        messages.push({
+          role: Sender.User,
+          content: req.data.content?.trim().replace(/\n/g, ' ')
+        });
+      }
 
-//       let messages = messageList.map(
-//         (message: { Sender: string; Comment: string }) => ({
-//           role: message.Sender === Sender.AI ? Sender.Assistant : Sender.User,
-//           content: message.Comment.trim().replace(/\n/g, ' ')
-//         })
-//       );
+      let Newrecord: any = {
+        chat: Chat,
+        role: Sender.User,
+        content: req.data.content?.trim().replace(/\n/g, ' ')
+      };
+      let succeeded = await INSERT(Newrecord).into(Records);
+      console.log(succeeded);
 
-//       messages.push({
-//         role: Sender.User,
-//         content: req.data.message?.trim().replace(/\n/g, ' ')
-//       });
+      console.log(messages);
+      const response = await new AzureOpenAiChatClient('gpt-4o').run({
+        messages
+      });
 
-//       let NewMessages:any = 
-//         {
-//           UUIDChat: chatId,
-//           Sender: Sender.HUMAN,
-//           Comment: req.data.message?.trim().replace(/\n/g, ' '),
-//           chat: chat
-//         }
-//       ;
-//       let succeeded = await INSERT(NewMessages).into(Message);
-//       console.log(succeeded);
+      if (!Chat.title) {
+        messages.push({
+          role: Sender.Assistant,
+          content: response.getContent()
+        });
 
-//       console.log(messages);
-//       const response = await new AzureOpenAiChatClient('gpt-4o').run({
-//         messages
-//       });
+        const Tooltype: AzureOpenAiChatCompletionToolType = 'function';
 
-//       if (!chat.ReportName) {
-//         messages.push({
-//           role: Sender.Assistant
-//           // content: response.getContent()
-//         });
+        const tools = [
+          {
+            type: Tooltype,
+            function: {
+              name: 'get_report_name',
+              description: '获取报表名称，比如采购订单报表，也可能叫采购订单表',
+              parameters: {
+                type: 'object',
+                properties: {
+                  ReportName: {
+                    type: 'string',
+                    description: '报表名称'
+                  }
+                }
+              }
+            }
+          }
+        ];
+        let get_report_mes: any = [
+          {
+            role: 'user',
+            content: req.data.content?.trim().replace(/\n/g, ' ')
+          }
+        ];
 
-//         const Tooltype: AzureOpenAiChatCompletionToolType = 'function';
+        const tool_response = await new AzureOpenAiChatClient('gpt-4o').run({
+          messages: get_report_mes,
+          tools //,tool_choice: 'required'
+        });
 
-//         const tools = [
-//           {
-//             type: Tooltype,
-//             function: {
-//               name: 'get_report_name',
-//               description:
-//                 '获取报表名称，比如采购订单报表，也可能叫采购订单表',
-//               parameters: {
-//                 type: 'object',
-//                 properties: {
-//                   ReportName: {
-//                     type: 'string',
-//                     description: '报表名称'
-//                   }
-//                 }
-//               }
-//             }
-//           }
-//         ];
-//         let get_report_mes: any = [
-//           {
-//             role: 'user',
-//             content: req.data.message?.trim().replace(/\n/g, ' ')
-//           }
-//         ];
+        if (tool_response.getFinishReason() == 'tool_calls') {
+          let Reportjson: any =
+            tool_response.data.choices[0].message?.tool_calls?.[0].function
+              .arguments;
 
-//         const tool_response = await new AzureOpenAiChatClient('gpt-4o').run({
-//           messages: get_report_mes,
-//           tools //,tool_choice: 'required'
-//         });
+          let Title = JSON.parse(Reportjson).ReportName;
+          console.log(Title);
 
-//         if (tool_response.getFinishReason() == 'tool_calls') {
-//           let Reportjson: any =
-//             tool_response.data.choices[0].message?.tool_calls?.[0].function
-//               .arguments;
-//           //  map(
-//           //   tool_call => ({
-//           //     arguments: tool_call.function.arguments
-//           //   })
-//           // )[0].arguments;
-//           let ReportName = JSON.parse(Reportjson).ReportName;
-//           console.log(ReportName);
+          const succeeded = await UPDATE(req.subject).with({
+            title: Title
+          });
 
-//        const succeeded = await UPDATE(Chat,chatId).with(
-//         {
-//           ReportName: ReportName
-//         }
-//        );
+          console.log(succeeded);
+        }
+      }
 
-//        console.log(succeeded);
-          
-//         }
-//       }
+      Newrecord = {
+        chat: Chat,
+        role: Sender.User,
+        content: req.data.content?.trim().replace(/\n/g, ' ')
+      };
+      console.log(Newrecord);
 
-//        NewMessages = 
-//         {
-//           UUIDChat: chatId,
-//           Sender: Sender.AI,
-//           Comment: response.getContent(),
-//           chat: chat
-//         }
-//       ;
-//       console.log(NewMessages);
+      succeeded = await INSERT(Newrecord).into(Records);
+      console.log(succeeded);
 
-//       succeeded = await INSERT(NewMessages).into(Message);
-//       console.log(succeeded);
-
-//       return response.getContent();
-//     });
-//     return super.init();
-//   }
-// }
+      return response.getContent();
+    });
+    return super.init();
+  }
+}

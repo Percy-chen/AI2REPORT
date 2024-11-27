@@ -1,9 +1,9 @@
 using {pwc.hand.ai2report as db} from '../../db/schema';
 
-service ChatService {
+service ChatService @(path:'/ai2report'){
     entity Chats        as projection on db.Chats
         actions {
-            action newRecord(content : LargeString) returns Records;
+            action newRecord(content : LargeString) returns String;
         }
 
     entity Records      as projection on db.Records

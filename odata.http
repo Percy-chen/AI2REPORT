@@ -3,25 +3,18 @@
 @auth = Basic pirate:ahoy
 @model = text-davinci-003
 
+DELETE {{host}}/ai2report/Records( ID = 'f0f132c6-a3d3-48ea-be80-ad488fc4c172' ) 
 
 # Call the function to get the list of OpenAI models
-POST {{host}}/odata/v4/chat/Chat
+POST {{host}}/ai2report/Chats
 Content-Type: application/json
 
-{"ChatName": "FC_TEST", "ReportName":""}
-
-
-# # Call the function to get the list of OpenAI models
-# POST {{host}}/odata/v4/chat/Chat(b8025973-9847-4450-bf77-f462ebb67c82)/NewMess
-# Content-Type: application/json
-
-# # ###
-# # DELETE {{host}}/odata/v4/chat/message( ID = 'b8025973-9847-4450-bf77-f462ebb67c82' ) 
+{}
 
 
 ### Call the function to get the list of OpenAI models
- GET {{host}}/odata/v4/chat/NewMessage(chatid='e0a19fb2-d859-44d7-96f4-0eca8121fa4a',message='hello,我要设计一张销售订单表')
-# //Content-Type: application/json
+ POST {{host}}/ai2report/Chats(f6c7dd0f-da2d-4e64-9b6a-9956f337d6b8)/newRecord
+ Content-Type: application/json
 
-# //{"chatid": "1", "message":"测试Prompt"}
+{"content": "我要设计一张采购订单报表"}
 
