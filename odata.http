@@ -16,5 +16,5 @@ Content-Type: application/json
  POST {{host}}/ai2report/Chats(f6c7dd0f-da2d-4e64-9b6a-9956f337d6b8)/newRecord
  Content-Type: application/json
 
-{"content": "我要设计一张采购订单报表"}
+{"content": "test"}
 

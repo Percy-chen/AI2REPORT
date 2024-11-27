@@ -1,9 +1,10 @@
 import {
-    AzureOpenAiChatClient,
-    AzureOpenAiChatCompletionToolType
+  AzureOpenAiChatClient,
+  AzureOpenAiChatCompletionToolType
 } from '@sap-ai-sdk/foundation-models';
 import { ApplicationService } from '@sap/cds';
 import { Sender } from './entities.js';
+
 export default class ChatService extends ApplicationService {
   init() {
     const { Chat } = require('#cds-models/ChatService');
@@ -14,13 +15,12 @@ export default class ChatService extends ApplicationService {
       //   const chatId:any = req.data.chatid
       const { Records } = this.entities;
 
-      const Chat = await SELECT.one.from(req.subject);
-      const [ Chats ] = req.params;
+      const chat = await SELECT.one.from(req.subject);
 
       //   if (!Chat) throw req.reject(404, 'chat "${chatId}" does not exist;');
       const records = await SELECT.from(Records)
         .where({
-          chat_ID: Chats
+          chat_ID: chat.ID
         })
         .orderBy('createdAt');
 
@@ -46,23 +46,22 @@ export default class ChatService extends ApplicationService {
       }
 
       let Newrecord: any = {
-        chat: Chat,
+        chat_ID: chat.ID,
         role: Sender.User,
         content: req.data.content?.trim().replace(/\n/g, ' ')
       };
       let succeeded = await INSERT(Newrecord).into(Records);
-      console.log(succeeded);
-
+  
       console.log(messages);
       const response = await new AzureOpenAiChatClient('gpt-4o').run({
         messages
       });
 
-      if (!Chat.title) {
-        messages.push({
-          role: Sender.Assistant,
-          content: response.getContent()
-        });
+      if (!chat.title) {
+        // messages.push({
+        //   role: Sender.Assistant,
+        //   content: response.getContent()
+        // });
 
         const Tooltype: AzureOpenAiChatCompletionToolType = 'function';
 
@@ -113,17 +112,20 @@ export default class ChatService extends ApplicationService {
       }
 
       Newrecord = {
-        chat: Chat,
+        chat_ID: chat.ID,
         role: Sender.User,
-        content: req.data.content?.trim().replace(/\n/g, ' ')
+        content: response.getContent()?.trim().replace(/\n/g, ' ')
       };
       console.log(Newrecord);
 
-      succeeded = await INSERT(Newrecord).into(Records);
-      console.log(succeeded);
+      // succeeded = await INSERT(Newrecord).into(Records);
 
-      return response.getContent();
+      return await this.run( INSERT(Newrecord).into(Records) )
+      
     });
     return super.init();
   }
+
+
 }
+
