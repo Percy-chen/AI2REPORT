@@ -16,8 +16,7 @@ service ChatService @(path:'/ai2report'){
             action generateProgram(ProjectId : String, Text : String, DevClass : String, TrKorr : String) returns Boolean;
             action generatePCL()                                                                          returns LargeString;
         }
-
+        
     entity ReportFields as projection on db.ReportFields;
     entity Parameters   as projection on db.Parameters;
-
 }
