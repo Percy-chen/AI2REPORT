@@ -5,16 +5,18 @@ import {
 import { ApplicationService } from '@sap/cds';
 import { Sender } from './entities.js';
 
+
 export default class ChatService extends ApplicationService {
   init() {
     const { Chat, Record } = require('#cds-models/ChatService');
     //
     // Action newRecord
     //
+    const { Records,Reports,ReportFields,Parameters } = this.entities;
     const { newRecord } = Chat.actions;
+    
     this.on(newRecord, async req => {
       //   const chatId:any = req.data.chatid
-      const { Records } = this.entities;
 
       const chat = await SELECT.one.from(req.subject);
 
@@ -25,33 +27,43 @@ export default class ChatService extends ApplicationService {
         })
         .orderBy('createdAt');
 
-      let messages: any = [
-        {
-          role: Sender.User,
-          content: req.data.content?.trim().replace(/\n/g, ' ')
-        }
-      ];
+      let messages: any 
 
       if (records) {
-        let messages = records.map(
+         messages = records.map(
           (record: { role: string; content: string }) => ({
             role:
               record.role === Sender.Assistant ? Sender.Assistant : Sender.User,
             content: record.content.trim().replace(/\n/g, ' ')
           })
         );
-        messages.push({
-          role: Sender.User,
-          content: req.data.content?.trim().replace(/\n/g, ' ')
-        });
+
+      } else{
+
+        const prompt =  await SELECT.one.from(Parameters).where( {name: 'Prompt_Report_ZH'})
+
+        if (!prompt) throw req.reject(404, '请维护Prompt_Report_ZH');
+
+        messages = [
+          {
+            role: Sender.User,
+            content: prompt
+          }
+        ];
       }
+
+      messages.push({
+        role: Sender.User,
+        content: req.data.content?.trim().replace(/\n/g, ' ')
+      });
 
       let Newrecord: any = {
         chat_ID: chat.ID,
         role: Sender.User,
         content: req.data.content?.trim().replace(/\n/g, ' ')
       };
-      let succeeded = await INSERT(Newrecord).into(Records);
+      
+      await INSERT(Newrecord).into(Records);
 
       console.log(messages);
       const response = await new AzureOpenAiChatClient('gpt-4o').run({
@@ -132,95 +144,102 @@ export default class ChatService extends ApplicationService {
 
       const Tooltype: AzureOpenAiChatCompletionToolType = 'function';
 
-      const tools = [
-        {
-          type: Tooltype,
-          function: {
-            name: 'get_report_fields',
-            description:
-              '总结信息以填充 `Reports` 实体的一条数据和 `ReportFields` 实体的多条数据表,只返回一个JSON',
-            parameters: {
-              type: 'object',
-              properties: {
-                Reports: {
+      let func = await SELECT.one.from(Parameters).where( {name: 'Prompt_JSON_ZH'})
+
+      if (!func){
+        func = {
+          name: 'get_report_fields',
+          description:
+            '总结信息以填充 `Reports` 实体的一条数据和 `ReportFields` 实体的多条数据表,只返回一个JSON',
+          parameters: {
+            type: 'object',
+            properties: {
+              Reports: {
+                type: 'object',
+                properties: {
+                  Text: {
+                    type: 'string',
+                    description: '报表名称'
+                  }
+                }
+              },
+              fields: {
+                type: 'array',
+                items: {
                   type: 'object',
                   properties: {
-                    Text: {
+                    category: {
+                      enum: ['_Selection', '_ListField', '_ItemField'],
+                      description:
+                        '<字段显示区域的分类：_Selection(选择项目)，_ListField(一览项目)，_HeaderField(详细画面Header项目)，_ItemField(详细画面明细项目)>'
+                    },
+                    TabFdPos: {
+                      type: 'number',
+                      description: '<字段在相应区域中的位置，整数>'
+                    },
+                    ParamText: {
                       type: 'string',
-                      description: '报表名称'
-                    }
-                  }
-                },
-                fields: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      category: {
-                        enum: ['_Selection', '_ListField', '_ItemField'],
-                        description:
-                          '<字段显示区域的分类：_Selection(选择项目)，_ListField(一览项目)，_HeaderField(详细画面Header项目)，_ItemField(详细画面明细项目)>'
-                      },
-                      TabFdPos: {
-                        type: 'number',
-                        description: '<字段在相应区域中的位置，整数>'
-                      },
-                      ParamText: {
-                        type: 'string',
-                        description: '<报表上的字段名称>'
-                      },
-                      FieldType: {
-                        enum: [
-                          'TextBox',
-                          'Checkbox',
-                          'RadioButtion',
-                          'DatePicker',
-                          'TextArea',
-                          'Currency'
-                        ],
-                        description:
-                          '<项目种类，值包括TextBox，Checkbox，RadioButtion、DatePicker、TextArea、Currency>'
-                      },
-                      Display: {
-                        enum: ['X', ''],
-                        description:
-                          '<字段是否在报告中可见，可见为X, 不可见为空格>'
-                      },
-                      Enterable: {
-                        enum: ['X', ''],
-                        description: '<字段是否可输入选择参数，值为X或者空格>'
-                      },
-                      Obligatory: {
-                        enum: ['X', ''],
-                        description: '<字段是否为必填项，值为X或者空格>'
-                      },
-                      ValueHelp: {
-                        enum: ['X', ''],
-                        description:
-                          '<字段是否支持值帮助或搜索帮助，值为X或者空格>'
-                      },
-                      ToEntityText: {
-                        type: 'string',
-                        description: '<目标实体的描述（相关实体的文本描述）>'
-                      },
-                      ToEntity: {
-                        type: 'string',
-                        description: '<目标实体的ID>'
-                      },
-                      ToFieldText: {
-                        type: 'string',
-                        description: '<目标实体的字段的文本描述>'
-                      },
-                      ToField: {
-                        type: 'string',
-                        description: '<目标实体字段名>'
-                      }
+                      description: '<报表上的字段名称>'
+                    },
+                    FieldType: {
+                      enum: [
+                        'TextBox',
+                        'Checkbox',
+                        'RadioButtion',
+                        'DatePicker',
+                        'TextArea',
+                        'Currency'
+                      ],
+                      description:
+                        '<项目种类，值包括TextBox，Checkbox，RadioButtion、DatePicker、TextArea、Currency>'
+                    },
+                    Display: {
+                      enum: ['X', ''],
+                      description:
+                        '<字段是否在报告中可见，可见为X, 不可见为空格>'
+                    },
+                    Enterable: {
+                      enum: ['X', ''],
+                      description: '<字段是否可输入选择参数，值为X或者空格>'
+                    },
+                    Obligatory: {
+                      enum: ['X', ''],
+                      description: '<字段是否为必填项，值为X或者空格>'
+                    },
+                    ValueHelp: {
+                      enum: ['X', ''],
+                      description:
+                        '<字段是否支持值帮助或搜索帮助，值为X或者空格>'
+                    },
+                    ToEntityText: {
+                      type: 'string',
+                      description: '<目标实体的描述（相关实体的文本描述）>'
+                    },
+                    ToEntity: {
+                      type: 'string',
+                      description: '<目标实体的ID>'
+                    },
+                    ToFieldText: {
+                      type: 'string',
+                      description: '<目标实体的字段的文本描述>'
+                    },
+                    ToField: {
+                      type: 'string',
+                      description: '<目标实体字段名>'
                     }
                   }
                 }
               }
             }
           }
+        }
+      } else {
+        func = JSON.parse(func)
+      }
+      const tools = [
+        {
+          type: Tooltype,
+          function: func
         }
       ];
 
@@ -266,7 +285,7 @@ export default class ChatService extends ApplicationService {
 
         let Report = JSON.parse(Reportjson)
 
-        const { Reports,ReportFields } = this.entities;
+
 
         let newReport = await this.run(INSERT.into(Reports).entries({record_ID: record.ID,Text: Report.Reports.Text}));
 

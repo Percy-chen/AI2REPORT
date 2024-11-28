@@ -3,7 +3,7 @@
   "name": "ai2report",
   "version": "0.0.1",
   "description": "AI2REPORT CAP project.",
-  "repository": "https://github.com/sap/ai-sdk-js",
+  "repository": "https://rdc.hand-china.com/gitlab/3749/ai2report.git",
   "license": "UNLICENSED",
   "private": true,
   "dependencies": {
