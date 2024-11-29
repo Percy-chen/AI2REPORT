@@ -24,7 +24,7 @@
 				</VBox>
 				<VBox class="chat-bot-ui">
 					<ScrollContainer height="100%" width="100%" vertical="true" focusable="true">
-						<MessageStrip text="Hello, I am your Chatbot. How can I help you?" type="Success" showIcon="true" showCloseButton="false"
+						<MessageStrip text="请输入报表名称或者需求内容" type="Success" showIcon="true" showCloseButton="false"
 							class="sapUiMediumMarginBottom"></MessageStrip>
 						<VBox items="{ui>/chatbot/messages}">
 							<VBox>

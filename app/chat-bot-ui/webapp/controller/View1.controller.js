@@ -30,6 +30,7 @@ function (Controller, JSONModel, library) {
 
             this.getView().setModel(oUiModel, "ui");
             this._apiGetchat();
+            this.onNewChat();
         },
 
         onBtnSummaryPress: async function () {
