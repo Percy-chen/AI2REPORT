@@ -1,0 +1,1 @@
+using AzureOpenAiService as service from '../../srv/azure-openai-service';
